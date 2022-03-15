@@ -124,6 +124,10 @@ impl ResolveError {
         }
         .into()
     }
+    /// from send
+    pub fn from_send(response: DnsResponse) -> Result<DnsResponse, Self> {
+        Ok(response)
+    }
 
     /// Get the kind of the error
     pub fn kind(&self) -> &ResolveErrorKind {

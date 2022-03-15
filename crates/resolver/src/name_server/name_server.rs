@@ -139,10 +139,6 @@ impl<C: DnsHandle<Error = ResolveError>, P: ConnectionProvider<Conn = C>> NameSe
 
         match response {
             Ok(response) => {
-                // First evaluate if the message succeeded.
-                let response =
-                    ResolveError::from_response(response, self.config.trust_nx_responses)?;
-
                 // TODO: consider making message::take_edns...
                 let remote_edns = response.edns().cloned();
 

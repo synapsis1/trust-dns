@@ -13,6 +13,7 @@ use std::sync::Mutex;
 use proto::rr::domain::TryParseIp;
 use proto::rr::IntoName;
 use proto::rr::RecordType;
+use proto::xfer::{DnsRequest, DnsResponse};
 use tokio::runtime::{self, Runtime};
 use trust_dns_proto::xfer::DnsRequestOptions;
 
@@ -120,6 +121,16 @@ impl Resolver {
         let clearing = self.async_resolver.clear_cache();
         self.runtime.lock()?.block_on(clearing);
         Ok(())
+    }
+
+    /// Send full DNS Message
+    ///
+    /// # Arguments
+    ///
+    /// * `msg` - DNS Message
+    pub fn send<R: Into<DnsRequest>>(&self, msg: R) -> Result<DnsResponse, ResolveError> {
+        let query = self.async_resolver.send(msg.into());
+        self.runtime.lock()?.block_on(query)
     }
 
     /// Generic lookup for any RecordType

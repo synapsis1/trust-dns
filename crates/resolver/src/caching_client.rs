@@ -25,10 +25,11 @@ use proto::rr::domain::usage::{
 };
 use proto::rr::rdata::SOA;
 use proto::rr::{DNSClass, Name, RData, Record, RecordType};
-use proto::xfer::{DnsHandle, DnsRequestOptions, DnsResponse, FirstAnswer};
+use proto::xfer::{DnsHandle, DnsRequest, DnsRequestOptions, DnsResponse, FirstAnswer};
 
 use crate::dns_lru::DnsLru;
 use crate::dns_lru::{self, TtlConfig};
+
 use crate::error::*;
 use crate::lookup::Lookup;
 
@@ -105,6 +106,32 @@ where
         Box::pin(Self::inner_lookup(query, options, self.clone(), vec![]))
     }
 
+    /// Perform a lookup against this caching client, looking first in the cache for a result
+    pub fn send(
+        &mut self,
+        query: DnsRequest,
+    ) -> Pin<Box<dyn Future<Output = Result<DnsResponse, ResolveError>> + Send>> {
+        Box::pin(Self::inner_send(query, self.clone()))
+    }
+
+    async fn inner_send(query: DnsRequest, mut client: Self) -> Result<DnsResponse, ResolveError> {
+        //   let response_message = client.client.send(query.clone()).await.map_err(E::into);
+        let response_message = client
+            .client
+            .send(query.clone())
+            .first_answer()
+            .await
+            .map_err(E::into);
+
+        // TODO: technically this might be duplicating work, as name_server already performs this evaluation.
+        //  we may want to create a new type, if evaluated... but this is most generic to support any impl in LookupState...
+        if let Ok(response) = response_message {
+            ResolveError::from_send(response)
+        } else {
+            response_message
+        }
+    }
+
     async fn inner_lookup(
         query: Query,
         options: DnsRequestOptions,
@@ -121,6 +148,7 @@ where
         // localhost names to their configured caching DNS server(s).
         // ```
         // special use rules only apply to the IN Class
+
         if query.query_class() == DNSClass::IN {
             let usage = match query.name() {
                 n if LOCALHOST_usage.zone_of(n) => &*LOCALHOST_usage,

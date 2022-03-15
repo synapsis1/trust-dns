@@ -17,14 +17,14 @@ use proto::op::Query;
 use proto::rr::domain::usage::ONION;
 use proto::rr::domain::TryParseIp;
 use proto::rr::{IntoName, Name, Record, RecordType};
-use proto::xfer::{DnsRequestOptions, RetryDnsHandle};
+use proto::xfer::{DnsRequest, DnsRequestOptions, DnsResponse, RetryDnsHandle};
 use proto::DnsHandle;
 
 use crate::caching_client::CachingClient;
 use crate::config::{ResolverConfig, ResolverOpts};
 use crate::dns_lru::{self, DnsLru};
 use crate::error::*;
-use crate::lookup::{self, Lookup, LookupEither, LookupFuture};
+use crate::lookup::{self, Lookup, LookupEither, LookupFuture, SendFuture};
 use crate::lookup_ip::{LookupIp, LookupIpFuture};
 use crate::name_server::{
     ConnectionProvider, GenericConnection, GenericConnectionProvider, NameServerPool,
@@ -294,6 +294,14 @@ impl<C: DnsHandle<Error = ResolveError>, P: ConnectionProvider<Conn = C>> AsyncR
             options,
             self.client_cache.clone(),
         ))
+    }
+
+    /// A future for the returned Lookup RData
+    pub fn send<R: Into<DnsRequest>>(
+        &self,
+        msg: R,
+    ) -> impl Future<Output = Result<DnsResponse, ResolveError>> + Send + Unpin + 'static {
+        SendFuture::send(msg.into(), self.client_cache.clone())
     }
 
     fn push_name(name: Name, names: &mut Vec<Name>) {
