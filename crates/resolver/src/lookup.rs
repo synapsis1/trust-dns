@@ -222,6 +222,34 @@ where
     query: Pin<Box<dyn Future<Output = Result<Lookup, ResolveError>> + Send>>,
 }
 
+#[doc(hidden)]
+pub struct SendFuture<C, E>
+where
+    C: DnsHandle<Error = E> + 'static,
+    E: Into<ResolveError> + From<ProtoError> + Error + Clone + Send + Unpin + 'static,
+{
+    #[allow(dead_code)]
+    client_cache: CachingClient<C, E>,
+    query: Pin<Box<dyn Future<Output = Result<DnsResponse, ResolveError>> + Send>>,
+}
+
+impl<C, E> SendFuture<C, E>
+where
+    C: DnsHandle<Error = E> + 'static,
+    E: Into<ResolveError> + From<ProtoError> + Error + Clone + Send + Unpin + 'static,
+{
+    /// send
+    pub fn send(msg: DnsRequest, mut client_cache: CachingClient<C, E>) -> Self {
+        let query: Pin<Box<dyn Future<Output = Result<DnsResponse, ResolveError>> + Send>> =
+            client_cache.send(msg).boxed();
+
+        Self {
+            client_cache,
+            query,
+        }
+    }
+}
+
 impl<C, E> LookupFuture<C, E>
 where
     C: DnsHandle<Error = E> + 'static,
@@ -259,6 +287,20 @@ where
             options,
             query,
         }
+    }
+}
+
+impl<C, E> Future for SendFuture<C, E>
+where
+    C: DnsHandle<Error = E> + 'static,
+    E: Into<ResolveError> + From<ProtoError> + Error + Clone + Send + Unpin + 'static,
+{
+    type Output = Result<DnsResponse, ResolveError>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        // Try polling the underlying DNS query.
+        let query = self.query.as_mut().poll_unpin(cx);
+        query
     }
 }
 
