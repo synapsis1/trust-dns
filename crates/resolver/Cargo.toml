@@ -2,7 +2,7 @@
 authors = ["Benjamin Fry <benjaminfry@me.com>"]
 edition = "2018"
 name = "trust-dns-resolver"
-version = "0.21.1"
+version = "0.21.2"
 
 # A short blurb about the package. This is not rendered in any format when
 # uploaded to crates.io (aka this is not markdown)
@@ -48,6 +48,8 @@ dns-over-tls = []
 dns-over-https = ["trust-dns-proto/dns-over-https"]
 dns-over-https-rustls = ["trust-dns-proto/dns-over-https-rustls", "dns-over-rustls", "dns-over-https"]
 
+dns-over-quic = ["rustls/quic", "dns-over-rustls", "trust-dns-proto/dns-over-quic"]
+
 dnssec = []
 dnssec-openssl = ["dnssec", "trust-dns-proto/dnssec-openssl"]
 dnssec-ring = ["dnssec", "trust-dns-proto/dnssec-ring"]
@@ -82,8 +84,7 @@ tokio = {version = "1.0", optional = true}
 tokio-native-tls = {version = "0.3", optional = true}
 tokio-openssl = {version = "0.6.0", optional = true}
 tokio-rustls = {version = "0.23.0", optional = true}
-trust-dns-proto = {version = "0.21.1", path = "../proto", default-features = false, features = ["dnssec", "serde-config"]}
-
+trust-dns-proto = {version = "0.21.2", path = "../proto", default-features = false, features = ["dnssec", "serde-config"]}
 webpki-roots = {version = "0.22.1", optional = true}
 
 [target.'cfg(windows)'.dependencies]
