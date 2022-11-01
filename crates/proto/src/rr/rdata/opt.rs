@@ -15,13 +15,14 @@
  */
 
 //! option record for passing protocol options between the client and server
+#![allow(clippy::use_self)]
 
 use std::collections::HashMap;
 
 #[cfg(feature = "serde-config")]
 use serde::{Deserialize, Serialize};
 
-use log::warn;
+use tracing::warn;
 
 use crate::error::*;
 use crate::serialize::binary::*;
@@ -254,7 +255,7 @@ pub fn read(decoder: &mut BinDecoder<'_>, rdata_length: Restrict<u16>) -> ProtoR
                     OptReadState::Data {
                         code,
                         length,
-                        // TODO: this cean be replaced with decoder.read_vec(), right?
+                        // TODO: this can be replaced with decoder.read_vec(), right?
                         //  the current version allows for malformed opt to be skipped...
                         collected: Vec::<u8>::with_capacity(length),
                     }
@@ -546,7 +547,7 @@ mod tests {
             0x00, 0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0x0b, 0x00, 0x00,
         ];
 
-        let mut decoder: BinDecoder<'_> = BinDecoder::new(&*bytes);
+        let mut decoder: BinDecoder<'_> = BinDecoder::new(&bytes);
         let read_rdata = read(&mut decoder, Restrict::new(bytes.len() as u16));
         assert!(
             read_rdata.is_ok(),

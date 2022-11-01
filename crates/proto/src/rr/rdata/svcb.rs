@@ -6,6 +6,7 @@
 // copied, modified, or distributed except according to those terms.
 
 //! SVCB records, see [draft-ietf-dnsop-svcb-https-03 SVCB and HTTPS RRs for DNS, February 2021](https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-03)
+#![allow(clippy::use_self)]
 
 use std::{
     cmp::{Ord, Ordering, PartialOrd},
@@ -271,16 +272,16 @@ impl BinEncodable for SvcParamKey {
 impl fmt::Display for SvcParamKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         match *self {
-            SvcParamKey::Mandatory => f.write_str("mandatory")?,
-            SvcParamKey::Alpn => f.write_str("alpn")?,
-            SvcParamKey::NoDefaultAlpn => f.write_str("no-default-alpn")?,
-            SvcParamKey::Port => f.write_str("port")?,
-            SvcParamKey::Ipv4Hint => f.write_str("ipv4hint")?,
-            SvcParamKey::EchConfig => f.write_str("echconfig")?,
-            SvcParamKey::Ipv6Hint => f.write_str("ipv6hint")?,
-            SvcParamKey::Key(val) => write!(f, "key{}", val)?,
-            SvcParamKey::Key65535 => f.write_str("key65535")?,
-            SvcParamKey::Unknown(val) => write!(f, "unknown{}", val)?,
+            Self::Mandatory => f.write_str("mandatory")?,
+            Self::Alpn => f.write_str("alpn")?,
+            Self::NoDefaultAlpn => f.write_str("no-default-alpn")?,
+            Self::Port => f.write_str("port")?,
+            Self::Ipv4Hint => f.write_str("ipv4hint")?,
+            Self::EchConfig => f.write_str("echconfig")?,
+            Self::Ipv6Hint => f.write_str("ipv6hint")?,
+            Self::Key(val) => write!(f, "key{}", val)?,
+            Self::Key65535 => f.write_str("key65535")?,
+            Self::Unknown(val) => write!(f, "unknown{}", val)?,
         }
 
         Ok(())
@@ -486,14 +487,14 @@ impl BinEncodable for SvcParamValue {
         let place = encoder.place::<u16>()?;
 
         match self {
-            SvcParamValue::Mandatory(mandatory) => mandatory.emit(encoder)?,
-            SvcParamValue::Alpn(alpn) => alpn.emit(encoder)?,
-            SvcParamValue::NoDefaultAlpn => (),
-            SvcParamValue::Port(port) => encoder.emit_u16(*port)?,
-            SvcParamValue::Ipv4Hint(ip_hint) => ip_hint.emit(encoder)?,
-            SvcParamValue::EchConfig(ech_config) => ech_config.emit(encoder)?,
-            SvcParamValue::Ipv6Hint(ip_hint) => ip_hint.emit(encoder)?,
-            SvcParamValue::Unknown(unknown) => unknown.emit(encoder)?,
+            Self::Mandatory(mandatory) => mandatory.emit(encoder)?,
+            Self::Alpn(alpn) => alpn.emit(encoder)?,
+            Self::NoDefaultAlpn => (),
+            Self::Port(port) => encoder.emit_u16(*port)?,
+            Self::Ipv4Hint(ip_hint) => ip_hint.emit(encoder)?,
+            Self::EchConfig(ech_config) => ech_config.emit(encoder)?,
+            Self::Ipv6Hint(ip_hint) => ip_hint.emit(encoder)?,
+            Self::Unknown(unknown) => unknown.emit(encoder)?,
         }
 
         // go back and set the length
@@ -508,14 +509,14 @@ impl BinEncodable for SvcParamValue {
 impl fmt::Display for SvcParamValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         match self {
-            SvcParamValue::Mandatory(mandatory) => write!(f, "{}", mandatory)?,
-            SvcParamValue::Alpn(alpn) => write!(f, "{}", alpn)?,
-            SvcParamValue::NoDefaultAlpn => (),
-            SvcParamValue::Port(port) => write!(f, "{}", port)?,
-            SvcParamValue::Ipv4Hint(ip_hint) => write!(f, "{}", ip_hint)?,
-            SvcParamValue::EchConfig(ech_config) => write!(f, "{}", ech_config)?,
-            SvcParamValue::Ipv6Hint(ip_hint) => write!(f, "{}", ip_hint)?,
-            SvcParamValue::Unknown(unknown) => write!(f, "{}", unknown)?,
+            Self::Mandatory(mandatory) => write!(f, "{}", mandatory)?,
+            Self::Alpn(alpn) => write!(f, "{}", alpn)?,
+            Self::NoDefaultAlpn => (),
+            Self::Port(port) => write!(f, "{}", port)?,
+            Self::Ipv4Hint(ip_hint) => write!(f, "{}", ip_hint)?,
+            Self::EchConfig(ech_config) => write!(f, "{}", ech_config)?,
+            Self::Ipv6Hint(ip_hint) => write!(f, "{}", ip_hint)?,
+            Self::Unknown(unknown) => write!(f, "{}", unknown)?,
         }
 
         Ok(())
@@ -1017,7 +1018,10 @@ impl<'r> BinDecodable<'r> for Unknown {
 
 impl BinEncodable for Unknown {
     fn emit(&self, encoder: &mut BinEncoder<'_>) -> ProtoResult<()> {
-        encoder.emit_character_data(&self.0)?;
+        // draft-ietf-dnsop-svcb-https-11#appendix-A: The algorithm is the same as used by
+        // <character-string> in RFC 1035, although the output length in this
+        // document is not limited to 255 octets.
+        encoder.emit_character_data_unrestricted(&self.0)?;
 
         Ok(())
     }
@@ -1182,9 +1186,6 @@ mod tests {
         emit(&mut encoder, &rdata).expect("failed to emit SVCB");
         let bytes = encoder.into_bytes();
 
-        println!("svcb: {}", rdata);
-        println!("bytes: {:?}", bytes);
-
         let mut decoder: BinDecoder<'_> = BinDecoder::new(bytes);
         let read_rdata =
             read(&mut decoder, Restrict::new(bytes.len() as u16)).expect("failed to read back");
@@ -1248,5 +1249,21 @@ mod tests {
             0, 0, 7, 7, 0, 0, 0, 0, 0, 0, 0,
         ];
         assert!(crate::op::Message::from_vec(BUF).is_err());
+    }
+
+    #[test]
+    fn test_unrestricted_output_size() {
+        let svcb = SVCB::new(
+            8224,
+            Name::from_utf8(".").unwrap(),
+            vec![(
+                SvcParamKey::Unknown(8224),
+                SvcParamValue::Unknown(Unknown(vec![32; 257])),
+            )],
+        );
+
+        let mut buf = Vec::new();
+        let mut encoder = BinEncoder::new(&mut buf);
+        emit(&mut encoder, &svcb).unwrap();
     }
 }

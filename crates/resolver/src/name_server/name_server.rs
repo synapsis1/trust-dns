@@ -17,6 +17,7 @@ use futures_util::stream::{once, Stream};
 #[cfg(feature = "mdns")]
 use proto::multicast::MDNS_IPV4;
 use proto::xfer::{DnsHandle, DnsRequest, DnsResponse, FirstAnswer};
+use tracing::debug;
 
 #[cfg(feature = "mdns")]
 use crate::config::Protocol;
@@ -51,12 +52,14 @@ impl<C: DnsHandle<Error = ResolveError>, P: ConnectionProvider<Conn = C>> Debug
 #[cfg(feature = "tokio-runtime")]
 #[cfg_attr(docsrs, doc(cfg(feature = "tokio-runtime")))]
 impl NameServer<TokioConnection, TokioConnectionProvider> {
+    /// A shortcut for constructing a nameserver usable in the Tokio runtime
     pub fn new(config: NameServerConfig, options: ResolverOpts, runtime: TokioHandle) -> Self {
         Self::new_with_provider(config, options, TokioConnectionProvider::new(runtime))
     }
 }
 
 impl<C: DnsHandle<Error = ResolveError>, P: ConnectionProvider<Conn = C>> NameServer<C, P> {
+    /// Construct a new Nameserver with the configuration and options. The connection provider will create UDP and TCP sockets
     pub fn new_with_provider(
         config: NameServerConfig,
         options: ResolverOpts,
@@ -135,18 +138,21 @@ impl<C: DnsHandle<Error = ResolveError>, P: ConnectionProvider<Conn = C>> NameSe
         request: R,
     ) -> Result<DnsResponse, ResolveError> {
         let mut client = self.connected_mut_client().await?;
+        let now = Instant::now();
         let response = client.send(request).first_answer().await;
+        let rtt = now.elapsed();
 
         match response {
             Ok(response) => {
+                // Record the measured latency.
+                self.stats.record_rtt(rtt);
+
                 // TODO: consider making message::take_edns...
                 let remote_edns = response.extensions().clone();
 
                 // take the remote edns options and store them
                 self.state.establish(remote_edns);
 
-                // record the success
-                self.stats.next_success();
                 Ok(response)
             }
             Err(error) => {
@@ -156,7 +162,7 @@ impl<C: DnsHandle<Error = ResolveError>, P: ConnectionProvider<Conn = C>> NameSe
                 self.state.fail(Instant::now());
 
                 // record the failure
-                self.stats.next_failure();
+                self.stats.record_connection_failure();
 
                 // These are connection failures, not lookup failures, that is handled in the resolver layer
                 Err(error)
@@ -164,6 +170,7 @@ impl<C: DnsHandle<Error = ResolveError>, P: ConnectionProvider<Conn = C>> NameSe
         }
     }
 
+    /// Specifies that this NameServer will treat negative responses as permanent failures and will not retry
     pub fn trust_nx_responses(&self) -> bool {
         self.config.trust_nx_responses
     }
@@ -195,17 +202,6 @@ impl<C: DnsHandle<Error = ResolveError>, P: ConnectionProvider<Conn = C>> Ord fo
         // if they are literally equal, just return
         if self == other {
             return Ordering::Equal;
-        }
-
-        // otherwise, run our evaluation to determine the next to be returned from the Heap
-        //   this will prefer established connections, we should try other connections after
-        //   some number to make sure that all are used. This is more important for when
-        //   latency is started to be used.
-        match self.state.cmp(&other.state) {
-            Ordering::Equal => (),
-            o => {
-                return o;
-            }
         }
 
         self.stats.cmp(&other.stats)
@@ -284,7 +280,7 @@ mod tests {
             bind_addr: None,
         };
         let io_loop = Runtime::new().unwrap();
-        let runtime_handle = TokioHandle;
+        let runtime_handle = TokioHandle::default();
         let name_server = future::lazy(|_| {
             NameServer::<_, TokioConnectionProvider>::new(
                 config,
@@ -323,7 +319,7 @@ mod tests {
             bind_addr: None,
         };
         let io_loop = Runtime::new().unwrap();
-        let runtime_handle = TokioHandle;
+        let runtime_handle = TokioHandle::default();
         let name_server = future::lazy(|_| {
             NameServer::<_, TokioConnectionProvider>::new(config, options, runtime_handle)
         });

@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use log::debug;
+use tracing::debug;
 
 use crate::{
     authority::{Authority, LookupError, LookupOptions, MessageRequest, UpdateResult, ZoneType},
@@ -65,7 +65,7 @@ pub trait AuthorityObject: Send + Sync {
     ///
     /// # Return value
     ///
-    /// Returns a vectory containing the results of the query, it will be empty if not found. If
+    /// Returns a vector containing the results of the query, it will be empty if not found. If
     ///  `is_secure` is true, in the case of no records found then NSEC records will be returned.
     async fn search(
         &self,
@@ -166,7 +166,7 @@ where
         lookup_options: LookupOptions,
     ) -> Result<Box<dyn LookupObject>, LookupError> {
         let this = self.as_ref();
-        let lookup = Authority::lookup(&*this, name, rtype, lookup_options).await;
+        let lookup = Authority::lookup(this, name, rtype, lookup_options).await;
         lookup.map(|l| Box::new(l) as Box<dyn LookupObject>)
     }
 
@@ -179,7 +179,7 @@ where
     ///
     /// # Return value
     ///
-    /// Returns a vectory containing the results of the query, it will be empty if not found. If
+    /// Returns a vector containing the results of the query, it will be empty if not found. If
     ///  `is_secure` is true, in the case of no records found then NSEC records will be returned.
     async fn search(
         &self,
@@ -188,7 +188,7 @@ where
     ) -> Result<Box<dyn LookupObject>, LookupError> {
         let this = self.as_ref();
         debug!("performing {} on {}", request_info.query, this.origin());
-        let lookup = Authority::search(&*this, request_info, lookup_options).await;
+        let lookup = Authority::search(this, request_info, lookup_options).await;
         lookup.map(|l| Box::new(l) as Box<dyn LookupObject>)
     }
 

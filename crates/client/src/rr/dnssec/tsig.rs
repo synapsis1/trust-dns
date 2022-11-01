@@ -5,7 +5,16 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
-//! tsigner is a structure for computing tsig messasignuthentication code for dns transactions
+//! Trust dns implementation of Secret Key Transaction Authentication for DNS (TSIG)
+//! [RFC 8945](https://www.rfc-editor.org/rfc/rfc8945) November 2020
+//!
+//! Current deviation from RFC in implementation as of 2022-10-28
+//!
+//! - Mac checking don't support HMAC truncation with TSIG (pedantic constant time verification)
+//! - Time checking not in TSIG implementation but in caller
+
+use tracing::debug;
+
 use crate::proto::error::{ProtoError, ProtoResult};
 use crate::proto::rr::dnssec::rdata::tsig::{
     make_tsig_record, message_tbs, signed_bitmessage_to_buf, TsigAlgorithm, TSIG,
@@ -22,7 +31,7 @@ use crate::rr::{Name, RData, Record};
 pub struct TSigner(Arc<TSignerInner>);
 
 struct TSignerInner {
-    key: Vec<u8>, // TODO this might want to be some sort of auto-zeroing on drop buffer, as it's cryptographic matterial
+    key: Vec<u8>, // TODO this might want to be some sort of auto-zeroing on drop buffer, as it's cryptographic material
     algorithm: TsigAlgorithm,
     signer_name: Name,
     fudge: u16,
@@ -108,7 +117,7 @@ impl TSigner {
     /// * a byte buffer containing the hash of this message. Need to be passed back when
     /// authenticating next message
     /// * a Range of time that is acceptable
-    /// * the time the signature was emited. It must be greater or equal to the time of previous
+    /// * the time the signature was emitted. It must be greater or equal to the time of previous
     /// messages, if any
     pub fn verify_message_byte(
         &self,
@@ -173,7 +182,7 @@ impl MessageFinalizer for TSigner {
         message: &Message,
         current_time: u32,
     ) -> ProtoResult<(Vec<Record>, Option<MessageVerifier>)> {
-        log::debug!("signing message: {:?}", message);
+        debug!("signing message: {:?}", message);
         let current_time = current_time as u64;
 
         let pre_tsig = TSIG::new(

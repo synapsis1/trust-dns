@@ -9,7 +9,7 @@
 
 use std::{fmt, iter, mem, ops::Deref, sync::Arc};
 
-use log::{debug, warn};
+use tracing::{debug, warn};
 
 use crate::{
     error::*,
@@ -19,7 +19,7 @@ use crate::{
     xfer::DnsResponse,
 };
 
-/// The basic request and response datastructure, used for all DNS protocols.
+/// The basic request and response data structure, used for all DNS protocols.
 ///
 /// [RFC 1035, DOMAIN NAMES - IMPLEMENTATION AND SPECIFICATION, November 1987](https://tools.ietf.org/html/rfc1035)
 ///
@@ -61,7 +61,7 @@ use crate::{
 ///
 /// By default Message is a Query. Use the Message::as_update() to create and update, or
 ///  Message::new_update()
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct Message {
     header: Header,
     queries: Vec<Query>,
@@ -411,6 +411,14 @@ impl Message {
     ///  record to create the EDNS `ResponseCode`
     pub fn response_code(&self) -> ResponseCode {
         self.header.response_code()
+    }
+
+    /// Returns the query from this Message.
+    ///
+    /// In almost all cases, a Message will only contain one query. This is a convenience function to get the single query.
+    /// See the alternative `queries*` methods for the raw set of queries in the Message
+    pub fn query(&self) -> Option<&Query> {
+        self.queries.first()
     }
 
     /// ```text
@@ -764,7 +772,7 @@ impl Message {
 ///  let msg = Message::new();
 ///  let MessageParts { queries, .. } = msg.into_parts();
 /// ```
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct MessageParts {
     /// message header
     pub header: Header,
@@ -863,7 +871,7 @@ pub trait MessageFinalizer: Send + Sync + 'static {
         current_time: u32,
     ) -> ProtoResult<(Vec<Record>, Option<MessageVerifier>)>;
 
-    /// Return whether the message require futher processing before being sent
+    /// Return whether the message requires further processing before being sent
     /// By default, returns true for AXFR and IXFR queries, and Update and Notify messages
     fn should_finalize_message(&self, message: &Message) -> bool {
         [OpCode::Update, OpCode::Notify].contains(&message.op_code())
@@ -1078,12 +1086,17 @@ impl fmt::Display for Message {
 
         writeln!(f, "; query")?;
         write_query(self.queries(), f)?;
-        writeln!(f, "; answers {}", self.answer_count())?;
-        write_slice(self.answers(), f)?;
-        writeln!(f, "; nameservers {}", self.name_server_count())?;
-        write_slice(self.name_servers(), f)?;
-        writeln!(f, "; additionals {}", self.additional_count())?;
-        write_slice(self.additionals(), f)?;
+
+        if self.header().message_type() == MessageType::Response
+            || self.header().op_code() == OpCode::Update
+        {
+            writeln!(f, "; answers {}", self.answer_count())?;
+            write_slice(self.answers(), f)?;
+            writeln!(f, "; nameservers {}", self.name_server_count())?;
+            write_slice(self.name_servers(), f)?;
+            writeln!(f, "; additionals {}", self.additional_count())?;
+            write_slice(self.additionals(), f)?;
+        }
 
         Ok(())
     }
@@ -1166,7 +1179,7 @@ fn test_legit_message() {
     let buf: Vec<u8> = vec![
     0x10,0x00,0x81,0x80, // id = 4096, response, op=query, recursion_desired, recursion_available, no_error
     0x00,0x01,0x00,0x01, // 1 query, 1 answer,
-    0x00,0x00,0x00,0x00, // 0 namesservers, 0 additional record
+    0x00,0x00,0x00,0x00, // 0 nameservers, 0 additional record
 
     0x03,b'w',b'w',b'w', // query --- www.example.com
     0x07,b'e',b'x',b'a', //

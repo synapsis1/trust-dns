@@ -79,7 +79,7 @@ impl AuthLookup {
     pub fn unwrap_records(self) -> LookupRecords {
         match self {
             // TODO: this is ugly, what about the additionals?
-            AuthLookup::Records { answers, .. } => answers,
+            Self::Records { answers, .. } => answers,
             _ => LookupRecords::default(),
         }
     }
@@ -87,7 +87,7 @@ impl AuthLookup {
     /// Takes the additional records, leaving behind None
     pub fn take_additionals(&mut self) -> Option<LookupRecords> {
         match self {
-            AuthLookup::Records {
+            Self::Records {
                 ref mut additionals,
                 ..
             } => additionals.take(),
@@ -317,7 +317,7 @@ impl LookupRecords {
         }
     }
 
-    /// Construct a new LookupRecords over a set of ResordSets
+    /// Construct a new LookupRecords over a set of RecordSets
     pub fn many(lookup_options: LookupOptions, mut records: Vec<Arc<RecordSet>>) -> Self {
         // we're reversing the records because they are output in reverse order, via pop()
         records.reverse();

@@ -13,8 +13,8 @@ use std::time::Duration;
 
 use futures_util::ready;
 use futures_util::stream::{Stream, StreamExt};
-use log::debug;
 use rand;
+use tracing::debug;
 use trust_dns_proto::op::Edns;
 
 use crate::client::Signer;
@@ -105,8 +105,7 @@ impl AsyncClient {
         S: DnsClientStream + 'static + Unpin,
     {
         let mp = DnsMultiplexer::with_timeout(stream, stream_handle, timeout_duration, signer);
-        let a = Self::connect(mp).await;
-        a
+        Self::connect(mp).await
     }
 
     /// Returns a future, which itself wraps a future which is awaiting connection.
@@ -218,7 +217,7 @@ pub trait ClientHandle: 'static + Clone + DnsHandle<Error = ProtoError> + Send {
     ///   3.7. A NOTIFY request has QDCOUNT>0, ANCOUNT>=0, AUCOUNT>=0,
     ///   ADCOUNT>=0.  If ANCOUNT>0, then the answer section represents an
     ///   unsecure hint at the new RRset for this <QNAME,QCLASS,QTYPE>.  A
-    ///   Secondary receiving such a hint is free to treat equivilence of this
+    ///   Secondary receiving such a hint is free to treat equivalence of this
     ///   answer section with its local data as a "no further work needs to be
     ///   done" indication.  If ANCOUNT=0, or ANCOUNT>0 and the answer section
     ///   differs from the Secondary's local data, then the Secondary should query its
@@ -788,15 +787,12 @@ impl<R> ClientStreamXfrState<R> {
                     }
                     1 => {
                         *self = Ended;
-                        if answers.last().unwrap(/* answers is not empty */).rr_type()
-                            == RecordType::SOA
-                        {
-                            Ok(())
-                        } else {
-                            Err(ClientErrorKind::Message(
+                        match answers.last().map(|r| r.rr_type()) {
+                            Some(RecordType::SOA) => Ok(()),
+                            _ => Err(ClientErrorKind::Message(
                                 "invalid zone transfer, contains trailing records",
                             )
-                            .into())
+                            .into()),
                         }
                     }
                     _ => {
@@ -851,20 +847,11 @@ where
             return Poll::Ready(None);
         }
 
-        let message = if let Some(response) = ready!(self.state.inner().poll_next_unpin(cx)) {
-            Some(match response {
-                Ok(ok) => {
-                    if let Err(e) = self.state.process(ok.answers()) {
-                        Err(e)
-                    } else {
-                        Ok(ok)
-                    }
-                }
-                Err(e) => Err(e.into()),
-            })
-        } else {
-            None
-        };
+        let message = ready!(self.state.inner().poll_next_unpin(cx)).map(|response| {
+            let ok = response?;
+            self.state.process(ok.answers())?;
+            Ok(ok)
+        });
         Poll::Ready(message)
     }
 }

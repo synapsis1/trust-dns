@@ -2,7 +2,7 @@
 authors = ["Benjamin Fry <benjaminfry@me.com>"]
 edition = "2018"
 name = "trust-dns-resolver"
-version = "0.21.2"
+version = "0.22.0"
 
 # A short blurb about the package. This is not rendered in any format when
 # uploaded to crates.io (aka this is not markdown)
@@ -36,8 +36,8 @@ codecov = {repository = "bluejekyll/trust-dns", branch = "main", service = "gith
 maintenance = {status = "actively-developed"}
 
 [features]
-backtrace = ["trust-dns-proto/backtrace"]
 default = ["system-config", "tokio-runtime"]
+#backtrace = ["dep:backtrace", "trust-dns-proto/backtrace"]
 dns-over-native-tls = ["dns-over-tls", "tokio-native-tls", "trust-dns-proto/dns-over-native-tls"]
 # DNS over TLS with OpenSSL currently needs a good way to set default CAs, use rustls or native-tls
 dns-over-openssl = ["dns-over-tls", "trust-dns-proto/dns-over-openssl", "tokio-openssl"]
@@ -69,30 +69,33 @@ name = "trust_dns_resolver"
 path = "src/lib.rs"
 
 [dependencies]
+#backtrace = { version = "0.3.50", optional = true }
 cfg-if = "1.0.0"
 futures-util = {version = "0.3.5", default-features = false, features = ["std"]}
 lazy_static = "1.2.0"
-log = "0.4"
 lru-cache = "0.1.2"
 parking_lot = "0.12"
+rand = "0.8"
 resolv-conf = {version = "0.7.0", optional = true, features = ["system"]}
 rustls = {version = "0.20.0", optional = true}
 serde = {version = "1.0", features = ["derive"], optional = true}
 smallvec = "1.6"
 thiserror = "1.0.20"
-tokio = {version = "1.0", optional = true}
+tokio = {version = "1.21", optional = true}
 tokio-native-tls = {version = "0.3", optional = true}
 tokio-openssl = {version = "0.6.0", optional = true}
 tokio-rustls = {version = "0.23.0", optional = true}
-trust-dns-proto = {version = "0.21.2", path = "../proto", default-features = false, features = ["dnssec", "serde-config"]}
+tracing = "0.1.30"
+trust-dns-proto = {version = "0.22.0", path = "../proto", default-features = false, features = ["dnssec"]}
 webpki-roots = {version = "0.22.1", optional = true}
 
 [target.'cfg(windows)'.dependencies]
 ipconfig = {version = "0.3.0", optional = true}
 
 [dev-dependencies]
-env_logger = "0.9"
 futures-executor = {version = "0.3.5", default-features = false, features = ["std"]}
+tokio = {version = "1.0", features = ["macros", "test-util"]}
+tracing-subscriber = {version = "0.3", features = ["std", "fmt", "env-filter"]}
 
 [package.metadata.docs.rs]
 all-features = true

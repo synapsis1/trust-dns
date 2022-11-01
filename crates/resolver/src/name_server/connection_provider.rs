@@ -88,6 +88,7 @@ pub trait RuntimeProvider: Clone + 'static {
 
 /// A type defines the Handle which can spawn future.
 pub trait Spawn {
+    /// Spawn a future in the background
     fn spawn_bg<F>(&mut self, future: F)
     where
         F: Future<Output = Result<(), ProtoError>> + Send + 'static;
@@ -98,6 +99,7 @@ pub trait Spawn {
 pub struct GenericConnectionProvider<R: RuntimeProvider>(R::Handle);
 
 impl<R: RuntimeProvider> GenericConnectionProvider<R> {
+    /// construct a new Connection provider based on the Runtime Handle
     pub fn new(handle: R::Handle) -> Self {
         Self(handle)
     }
@@ -377,19 +379,26 @@ impl Stream for ConnectionResponse {
 #[allow(unreachable_pub)]
 pub mod tokio_runtime {
     use super::*;
+    use std::sync::{Arc, Mutex};
     use tokio::net::UdpSocket as TokioUdpSocket;
+    use tokio::task::JoinSet;
 
-    #[derive(Clone, Copy)]
-    pub struct TokioHandle;
+    /// A handle to the Tokio runtime
+    #[derive(Clone, Default)]
+    pub struct TokioHandle {
+        join_set: Arc<Mutex<JoinSet<Result<(), ProtoError>>>>,
+    }
+
     impl Spawn for TokioHandle {
         fn spawn_bg<F>(&mut self, future: F)
         where
             F: Future<Output = Result<(), ProtoError>> + Send + 'static,
         {
-            let _join = tokio::spawn(future);
+            self.join_set.lock().unwrap().spawn(future);
         }
     }
 
+    /// The Tokio Runtime for async execution
     #[derive(Clone, Copy)]
     pub struct TokioRuntime;
     impl RuntimeProvider for TokioRuntime {
@@ -398,6 +407,10 @@ pub mod tokio_runtime {
         type Timer = TokioTime;
         type Udp = TokioUdpSocket;
     }
+
+    /// An alias for Tokio use cases
     pub type TokioConnection = GenericConnection;
+
+    /// An alias for Tokio use cases
     pub type TokioConnectionProvider = GenericConnectionProvider<TokioRuntime>;
 }

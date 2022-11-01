@@ -48,14 +48,16 @@
 
 pub use trust_dns_client as client;
 pub use trust_dns_proto as proto;
+#[cfg(feature = "trust-dns-recursor")]
+#[cfg_attr(docsrs, doc(cfg(feature = "recursor")))]
+pub use trust_dns_recursor as recursor;
 #[cfg(feature = "trust-dns-resolver")]
-#[cfg_attr(docsrs, doc(cfg(feature = "trust-dns-resolver")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "resolver")))]
 pub use trust_dns_resolver as resolver;
 
 pub mod authority;
 pub mod config;
 pub mod error;
-pub mod logger;
 pub mod server;
 pub mod store;
 

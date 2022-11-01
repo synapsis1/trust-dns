@@ -20,13 +20,13 @@ use trust_dns_server::store::sqlite::{Journal, SqliteAuthority};
 const TEST_HEADER: &Header = &Header::new();
 
 fn create_example() -> SqliteAuthority {
-    let authority = trust_dns_integration::authority::create_example();
+    let authority = trust_dns_integration::example_authority::create_example();
     SqliteAuthority::new(authority, true, false)
 }
 
 #[cfg(feature = "dnssec")]
 fn create_secure_example() -> SqliteAuthority {
-    let authority = trust_dns_integration::authority::create_secure_example();
+    let authority = trust_dns_integration::example_authority::create_secure_example();
     SqliteAuthority::new(authority, true, true)
 }
 
@@ -62,7 +62,7 @@ async fn test_search() {
     }
 }
 
-/// this is a litte more interesting b/c it requires a recursive lookup for the origin
+/// this is a little more interesting b/c it requires a recursive lookup for the origin
 #[tokio::test]
 async fn test_search_www() {
     let example = create_example();

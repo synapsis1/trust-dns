@@ -233,7 +233,7 @@ impl<'q> BinDecodable<'q> for MessageRequest {
 }
 
 /// A set of Queries with the associated serialized data
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Queries {
     queries: Vec<LowerQuery>,
     original: Box<[u8]>,
@@ -278,7 +278,10 @@ impl Queries {
     pub(crate) fn as_emit_and_count(&self) -> QueriesEmitAndCount<'_> {
         QueriesEmitAndCount {
             length: self.queries.len(),
-            original: self.original.as_ref(),
+            // We don't generally support more than one query, but this will at least give us one
+            // cache entry.
+            first_query: self.queries.get(0),
+            cached_serialized: self.original.as_ref(),
         }
     }
 
@@ -309,19 +312,33 @@ impl WireQuery {
     pub(crate) fn as_emit_and_count(&self) -> QueriesEmitAndCount<'_> {
         QueriesEmitAndCount {
             length: 1,
-            original: self.original.as_ref(),
+            first_query: Some(&self.query),
+            cached_serialized: self.original.as_ref(),
         }
     }
 }
 
 pub(crate) struct QueriesEmitAndCount<'q> {
+    /// Number of queries in this segment
     length: usize,
-    original: &'q [u8],
+    /// Use the first query, if it exists, to pre-populate the string compression cache
+    first_query: Option<&'q LowerQuery>,
+    /// The cached rendering of the original (wire-format) queries
+    cached_serialized: &'q [u8],
 }
 
 impl<'q> EmitAndCount for QueriesEmitAndCount<'q> {
     fn emit(&mut self, encoder: &mut BinEncoder<'_>) -> ProtoResult<usize> {
-        encoder.emit_vec(self.original)?;
+        let original_offset = encoder.offset();
+        encoder.emit_vec(self.cached_serialized)?;
+        if !encoder.is_canonical_names() {
+            if let Some(query) = self.first_query {
+                encoder.store_label_pointer(
+                    original_offset,
+                    original_offset + query.original().name().len(),
+                )
+            }
+        }
         Ok(self.length)
     }
 }

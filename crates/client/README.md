@@ -8,14 +8,14 @@ This library contains basic implementations for DNS record serialization, and co
 
 The `client` is capable of DNSSec validation as well as offering higher order functions for performing DNS operations:
 
-- [SyncDnssecClient](https://docs.rs/trust-dns/0.11.0/trust_dns/client/struct.SyncDnssecClient.html) - DNSSec validation
-- [create](https://docs.rs/trust-dns/0.11.0/trust_dns/client/trait.Client.html#method.create) - atomic create of a record, with authenticated request
-- [append](https://docs.rs/trust-dns/0.11.0/trust_dns/client/trait.Client.html#method.append) - verify existence of a record and append to it
-- [compare_and_swap](https://docs.rs/trust-dns/0.11.0/trust_dns/client/trait.Client.html#method.compare_and_swap) - atomic (depends on server) compare and swap
-- [delete_by_rdata](https://docs.rs/trust-dns/0.11.0/trust_dns/client/trait.Client.html#method.delete_by_rdata) - delete a specific record
-- [delete_rrset](https://docs.rs/trust-dns/0.11.0/trust_dns/client/trait.Client.html#method.delete_rrset) - delete an entire record set
-- [delete_all](https://docs.rs/trust-dns/0.11.0/trust_dns/client/trait.Client.html#method.delete_all) - delete all records sets with a given name
-- [notify](https://docs.rs/trust-dns/0.11.0/trust_dns/client/trait.Client.html#method.notify) - notify server that it should reload a zone
+- [SyncDnssecClient](https://docs.rs/trust-dns-client/latest/trust_dns_client/client/struct.SyncDnssecClient.html) - DNSSec validation
+- [create](https://docs.rs/trust-dns-client/latest/trust_dns_client/client/trait.Client.html#method.create) - atomic create of a record, with authenticated request
+- [append](https://docs.rs/trust-dns-client/latest/trust_dns_client/client/trait.Client.html#method.append) - verify existence of a record and append to it
+- [compare_and_swap](https://docs.rs/trust-dns-client/latest/trust_dns_client/client/trait.Client.html#method.compare_and_swap) - atomic (depends on server) compare and swap
+- [delete_by_rdata](https://docs.rs/trust-dns-client/latest/trust_dns_client/client/trait.Client.html#method.delete_by_rdata) - delete a specific record
+- [delete_rrset](https://docs.rs/trust-dns-client/latest/trust_dns_client/client/trait.Client.html#method.delete_rrset) - delete an entire record set
+- [delete_all](https://docs.rs/trust-dns-client/latest/trust_dns_client/client/trait.Client.html#method.delete_all) - delete all records sets with a given name
+- [notify](https://docs.rs/trust-dns-client/latest/trust_dns_client/client/trait.Client.html#method.notify) - notify server that it should reload a zone
 
 ## Example
 
@@ -65,16 +65,16 @@ To enable DoT one of the features `dns-over-native-tls`, `dns-over-openssl`, or 
 ## DNSSec status
 
 Currently the root key is hardcoded into the system. This gives validation of
- DNSKEY and DS records back to the root. NSEC is implemented, but not NSEC3.
- Because caching is not yet enabled, it has been noticed that some DNS servers
- appear to rate limit the connections, validating RRSIG records back to the root
- can require a significant number of additional queries for those records.
+DNSKEY and DS records back to the root. NSEC is implemented, but not NSEC3.
+Because caching is not yet enabled, it has been noticed that some DNS servers
+appear to rate limit the connections, validating RRSIG records back to the root
+can require a significant number of additional queries for those records.
 
-Zones will be automatically resigned on any record updates via dynamic DNS. To enable DNSSEC, one of the features `dnssec-openssl` or `dnssec-rustls` must be enabled.
+Zones will be automatically resigned on any record updates via dynamic DNS. To enable DNSSEC, one of the features `dnssec-openssl` or `dnssec-ring` must be enabled.
 
 ## Minimum Rust Version
 
-The current minimum rustc version for this project is `1.54`
+The current minimum rustc version for this project is `1.60`
 
 ## Versioning
 

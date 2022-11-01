@@ -14,9 +14,9 @@ use std::task::{Context, Poll};
 use async_trait::async_trait;
 use futures_util::stream::Stream;
 use futures_util::{future::Future, ready, TryFutureExt};
-use log::debug;
 use rand;
 use rand::distributions::{uniform::Uniform, Distribution};
+use tracing::{debug, warn};
 
 use crate::xfer::{BufDnsStreamHandle, SerialMessage, StreamReceiver};
 use crate::Time;
@@ -33,7 +33,7 @@ where
     /// setups up a "client" udp connection that will only receive packets from the associated address
     async fn connect(addr: SocketAddr) -> io::Result<Self>;
 
-    /// same as connect, but binds to the specified local address for seding address
+    /// same as connect, but binds to the specified local address for sending address
     async fn connect_with_bind(addr: SocketAddr, bind_addr: SocketAddr) -> io::Result<Self>;
 
     /// a "server" UDP socket, that bind to the local listening address, and unbound remote address (can receive from anything)
@@ -124,7 +124,7 @@ impl<S: UdpSocket + Send + 'static> UdpStream<S> {
     ///
     /// # Return
     ///
-    /// a tuple of a Future Stream which will handle sending and receiving messsages, and a
+    /// a tuple of a Future Stream which will handle sending and receiving messages, and a
     ///  handle which can be used to send messages into the stream.
     pub fn with_bound(socket: S, remote_addr: SocketAddr) -> (Self, BufDnsStreamHandle) {
         let (message_sender, outbound_messages) = BufDnsStreamHandle::new(remote_addr);
@@ -166,11 +166,17 @@ impl<S: UdpSocket + Send + 'static> Stream for UdpStream<S> {
             // first try to send
             let addr = message.addr();
 
-            // this wiil return if not ready,
-            //   meaning that sending will be prefered over receiving...
+            // this will return if not ready,
+            //   meaning that sending will be preferred over receiving...
 
             // TODO: shouldn't this return the error to send to the sender?
-            ready!(socket.poll_send_to(cx, message.bytes(), addr))?;
+            if let Err(e) = ready!(socket.poll_send_to(cx, message.bytes(), addr)) {
+                // Drop the UDP packet and continue
+                warn!(
+                    "error sending message to {} on udp_socket, dropping response: {}",
+                    addr, e
+                );
+            }
 
             // message sent, need to pop the message
             assert!(outbound_messages.as_mut().poll_next(cx).is_ready());
@@ -248,9 +254,15 @@ impl<S: UdpSocket> Future for NextRandomUdpSocket<S> {
                         debug!("created socket successfully");
                         return Poll::Ready(Ok(socket));
                     }
-                    Poll::Ready(Err(err)) => {
-                        debug!("unable to bind port, attempt: {}: {}", attempt, err)
-                    }
+                    Poll::Ready(Err(err)) => match err.kind() {
+                        io::ErrorKind::AddrInUse => {
+                            debug!("unable to bind port, attempt: {}: {}", attempt, err);
+                        }
+                        _ => {
+                            debug!("failed to bind port: {}", err);
+                            return Poll::Ready(Err(err));
+                        }
+                    },
                     Poll::Pending => debug!("unable to bind port, attempt: {}", attempt),
                 }
             }
@@ -276,7 +288,7 @@ impl UdpSocket for tokio::net::UdpSocket {
 
     /// setups up a "client" udp connection that will only receive packets from the associated address
     ///
-    /// if the addr is ipv4 then it will bind local addr to 0.0.0.0:0, ipv6 [::]0
+    /// if the addr is ipv4 then it will bind local addr to 0.0.0.0:0, ipv6 \[::\]0
     async fn connect(addr: SocketAddr) -> io::Result<Self> {
         let bind_addr: SocketAddr = match addr {
             SocketAddr::V4(_addr) => (Ipv4Addr::UNSPECIFIED, 0).into(),
@@ -286,7 +298,7 @@ impl UdpSocket for tokio::net::UdpSocket {
         Self::connect_with_bind(addr, bind_addr).await
     }
 
-    /// same as connect, but binds to the specified local address for seding address
+    /// same as connect, but binds to the specified local address for sending address
     async fn connect_with_bind(_addr: SocketAddr, bind_addr: SocketAddr) -> io::Result<Self> {
         let socket = Self::bind(bind_addr).await?;
 
