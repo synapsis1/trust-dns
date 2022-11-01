@@ -295,11 +295,8 @@ impl<C: DnsHandle<Error = ResolveError>, P: ConnectionProvider<Conn = C>> AsyncR
     }
 
     /// A future for the returned Lookup RData
-    pub fn send<R: Into<DnsRequest>>(
-        &self,
-        msg: R,
-    ) -> impl Future<Output = Result<DnsResponse, ResolveError>> + Send + Unpin + 'static {
-        SendFuture::send(msg.into(), self.client_cache.clone())
+    pub async fn send<R: Into<DnsRequest>>(&self, msg: R) -> Result<DnsResponse, ResolveError> {
+        SendFuture::send(msg.into(), self.client_cache.clone()).await
     }
 
     fn push_name(name: Name, names: &mut Vec<Name>) {
