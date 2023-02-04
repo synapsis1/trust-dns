@@ -44,14 +44,12 @@ pub struct Edns {
 
 impl Default for Edns {
     fn default() -> Self {
-        let mut opt = OPT::default();
-        opt.insert(EdnsOption::Unknown(0x0003, vec![]));
         Self {
             rcode_high: 0,
             version: 0,
             dnssec_ok: false,
             max_payload: 512,
-            options: opt,
+            options: OPT::default(),
         }
     }
 }
